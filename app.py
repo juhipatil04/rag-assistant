@@ -16,6 +16,10 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "qa" not in st.session_state:
     st.session_state.qa = None
+if "summary" not in st.session_state:
+    st.session_state.summary = None
+if "suggestions" not in st.session_state:
+    st.session_state.suggestions = []
 
 uploaded_files = st.file_uploader("Upload PDF(s)", type="pdf", accept_multiple_files=True)
 
@@ -48,7 +52,26 @@ if uploaded_files and st.session_state.qa is None:
             memory=memory,
             return_source_documents=True
         )
-    st.success(f"Ready! Loaded {len(uploaded_files)} PDF(s).")
+
+        full_text = " ".join([c.page_content for c in all_chunks[:20]])
+        summary_prompt = f"Summarize this document in 3 sentences:\n\n{full_text}"
+        st.session_state.summary = llm.invoke(summary_prompt).content
+
+        suggestions_prompt = f"Given this document, suggest exactly 3 short questions a user might ask. Return only a numbered list, nothing else:\n\n{full_text[:2000]}"
+        raw = llm.invoke(suggestions_prompt).content
+        lines = [l.strip() for l in raw.strip().split("\n") if l.strip()]
+        st.session_state.suggestions = [l.lstrip("123. ").strip() for l in lines[:3]]
+
+if st.session_state.summary:
+    with st.expander("Document Summary", expanded=True):
+        st.write(st.session_state.summary)
+
+if st.session_state.suggestions:
+    st.write("**Suggested questions:**")
+    cols = st.columns(3)
+    for i, suggestion in enumerate(st.session_state.suggestions):
+        if cols[i].button(suggestion, key=f"suggestion_{i}"):
+            st.session_state.pending_question = suggestion
 
 for message in st.session_state.chat_history:
     with st.chat_message(message["role"]):
@@ -56,6 +79,11 @@ for message in st.session_state.chat_history:
 
 if st.session_state.qa:
     question = st.chat_input("Ask a question about your documents...")
+
+    if "pending_question" in st.session_state and st.session_state.pending_question:
+        question = st.session_state.pending_question
+        st.session_state.pending_question = None
+
     if question:
         st.session_state.chat_history.append({"role": "user", "content": question})
         with st.chat_message("user"):
