@@ -6,8 +6,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_groq import ChatGroq
-from langchain_classic.chains import RetrievalQA
 from langchain_core.prompts import PromptTemplate
+from langchain_classic.chains import ConversationalRetrievalChain
+from langchain_classic.memory import ConversationBufferMemory
 
 st.title("RAG Document Assistant")
 
@@ -35,21 +36,16 @@ if uploaded_files and st.session_state.qa is None:
         db = Chroma.from_documents(all_chunks, embeddings)
         llm = ChatGroq(model="llama-3.1-8b-instant", api_key=os.environ["GROQ_API_KEY"])
 
-        prompt_template = """Use the following context to answer the question.
-Always cite which part of the document your answer comes from.
-If you don't know the answer, say so.
+        memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+            output_key="answer"
+        )
 
-Context:
-{context}
-
-Question: {question}
-Answer:"""
-        prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-
-        st.session_state.qa = RetrievalQA.from_chain_type(
+        st.session_state.qa = ConversationalRetrievalChain.from_llm(
             llm=llm,
             retriever=db.as_retriever(search_kwargs={"k": 20}),
-            chain_type_kwargs={"prompt": prompt},
+            memory=memory,
             return_source_documents=True
         )
     st.success(f"Ready! Loaded {len(uploaded_files)} PDF(s).")
@@ -67,8 +63,8 @@ if st.session_state.qa:
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                result = st.session_state.qa.invoke({"query": question})
-                answer = result["result"]
+                result = st.session_state.qa.invoke({"question": question})
+                answer = result["answer"]
                 sources = result["source_documents"]
 
                 st.write(answer)
