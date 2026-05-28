@@ -222,12 +222,5 @@ Game modes inject a fixed amount of document text at session start rather than r
 - **Persistent user sessions** — Each page refresh reinitializes state. Adding a session backend (Redis, SQLite) would support longer research workflows.
 - **Hybrid retrieval** — Combining dense retrieval (current) with sparse BM25 retrieval (keyword matching) typically improves recall for named entities, codes, and domain-specific terminology not well-represented in the embedding space.
 
----
-
-## License
-
-MIT
-
----
 
 *Built as an exploration of applied LLM engineering — RAG pipelines, prompt engineering, and interactive document intelligence.*
